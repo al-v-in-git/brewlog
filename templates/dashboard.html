@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell dashboard-shell">
+    <section class="panel dashboard-header">
+        <div>
+            <p class="eyebrow">Dashboard</p>
+            <h1>{{ user_name }}'s BrewLog</h1>
+            <p class="subtle">Track brewing sessions, compare patterns, and save your best cups.</p>
+        </div>
+        <div class="actions compact-actions">
+            <a class="button primary" href="{{ url_for('add_brew') }}">Add Brew</a>
+            <a class="button secondary" href="{{ url_for('history') }}">View History</a>
+        </div>
+    </section>
+
+    {% if error %}
+    <section class="panel">
+        <p class="message error">{{ error }}</p>
+    </section>
+    {% endif %}
+
+    <section class="stats-grid">
+        <article class="panel stat-card">
+            <p class="eyebrow">Total Brews</p>
+            <h2>{{ summary.total_brews }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Top Method</p>
+            <h2>{{ summary.top_method }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Average Rating</p>
+            <h2>{{ summary.average_rating }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Favorites</p>
+            <h2>{{ summary.favorite_brews }}</h2>
+        </article>
+    </section>
+
+    <section class="panel quick-links">
+        <div class="section-title">
+            <h2>Explore</h2>
+            <p class="subtle">Jump into the features that make BrewLog feel like a full tracker.</p>
+        </div>
+        <div class="feature-grid">
+            <a class="feature-tile" href="{{ url_for('history') }}">
+                <strong>Brew History</strong>
+                <span>Search, filter, sort, favorite, and delete brew entries.</span>
+            </a>
+            <a class="feature-tile" href="{{ url_for('analytics') }}">
+                <strong>Analytics</strong>
+                <span>See total brews, favorite patterns, and Chart.js summaries.</span>
+            </a>
+            <a class="feature-tile" href="{{ url_for('calculator') }}">
+                <strong>Ratio Calculator</strong>
+                <span>Use a 1:15 ratio to calculate water instantly.</span>
+            </a>
+            <a class="feature-tile" href="{{ url_for('favorites') }}">
+                <strong>Favorite Recipes</strong>
+                <span>View the brews you marked as keepers.</span>
+            </a>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="section-title">
+            <h2>Recent Brews</h2>
+            <p class="subtle">Your latest five entries.</p>
+        </div>
+
+        {% if brew_logs %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Bean</th>
+                        <th>Method</th>
+                        <th>Rating</th>
+                        <th>Favorite</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brew in brew_logs %}
+                    <tr>
+                        <td>{{ brew.created_at.strftime("%d %b %Y") if brew.created_at else "" }}</td>
+                        <td>{{ brew.bean_name }}</td>
+                        <td>{{ brew.method }}</td>
+                        <td>
+                            <span class="stars" aria-label="{{ brew.rating }} out of 5">
+                                {% for _ in range(brew.rating) %}★{% endfor %}{% for _ in range(5 - brew.rating) %}☆{% endfor %}
+                            </span>
+                        </td>
+                        <td>{{ "Yes" if brew.favorite else "No" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No brew logs yet.</p>
+            <p class="subtle">Add your first coffee brewing session to start building your history.</p>
+        </div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

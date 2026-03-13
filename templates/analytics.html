@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics | BrewLog{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<main class="shell dashboard-shell">
+    <section class="panel">
+        <p class="eyebrow">Analytics</p>
+        <h1>Brew insights</h1>
+        <p class="subtle">A quick snapshot of how you brew, what you rate highest, and which beans show up most often.</p>
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+    </section>
+
+    <section class="stats-grid">
+        <article class="panel stat-card">
+            <p class="eyebrow">Total Brews</p>
+            <h2>{{ analytics.total_brews }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Most Used Method</p>
+            <h2>{{ analytics.most_used_method }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Average Rating</p>
+            <h2>{{ analytics.average_rating }}</h2>
+        </article>
+        <article class="panel stat-card">
+            <p class="eyebrow">Most Used Bean</p>
+            <h2>{{ analytics.most_used_bean }}</h2>
+        </article>
+    </section>
+
+    <section class="chart-grid">
+        <article class="panel">
+            <div class="section-title">
+                <h2>Method Breakdown</h2>
+                <p class="subtle">How often each brewing method appears.</p>
+            </div>
+            <canvas id="methodChart"></canvas>
+        </article>
+        <article class="panel">
+            <div class="section-title">
+                <h2>Rating Breakdown</h2>
+                <p class="subtle">Distribution of your brew ratings.</p>
+            </div>
+            <canvas id="ratingChart"></canvas>
+        </article>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.analyticsPayload = {
+        methodLabels: {{ analytics.method_chart_labels | tojson }},
+        methodValues: {{ analytics.method_chart_values | tojson }},
+        ratingLabels: {{ analytics.rating_chart_labels | tojson }},
+        ratingValues: {{ analytics.rating_chart_values | tojson }}
+    };
+</script>
+{% endblock %}

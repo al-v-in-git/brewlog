@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Add Brew | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <section class="panel form-panel">
+        <div class="section-title">
+            <div>
+                <p class="eyebrow">New Brew Entry</p>
+                <h1>Record a coffee session</h1>
+            </div>
+            <a class="button secondary" href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+        </div>
+
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" class="grid-form" enctype="multipart/form-data" data-brew-form>
+            <div>
+                <label for="bean_id">Coffee Bean</label>
+                <select id="bean_id" name="bean_id" required>
+                    <option value="">Select a bean</option>
+                    {% for bean in beans %}
+                    <option value="{{ bean.id }}">{{ bean.name }} | {{ bean.origin }} | {{ bean.roast_level }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="method">Method</label>
+                <input id="method" type="text" name="method" placeholder="Pour Over, French Press" required>
+            </div>
+
+            <div>
+                <label for="grind_size">Grind Size</label>
+                <input id="grind_size" type="text" name="grind_size" required>
+            </div>
+
+            <div>
+                <label for="water_temp">Water Temperature (C)</label>
+                <input id="water_temp" type="number" name="water_temp" min="1" required>
+            </div>
+
+            <div>
+                <label for="brew_time">Brew Time</label>
+                <input id="brew_time" type="text" name="brew_time" placeholder="3:15" required>
+            </div>
+
+            <div>
+                <label for="rating">Rating</label>
+                <input id="rating" type="number" name="rating" min="1" max="5" required>
+            </div>
+
+            <div>
+                <label for="brew_image">Brew Image</label>
+                <input id="brew_image" type="file" name="brew_image" accept=".png,.jpg,.jpeg,.gif,.webp">
+            </div>
+
+            <div class="checkbox-wrap">
+                <label class="checkbox">
+                    <input type="checkbox" name="favorite">
+                    <span>Mark as favorite recipe</span>
+                </label>
+            </div>
+
+            <div class="full-width">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" rows="5" placeholder="Flavor notes, ratio, bloom details"></textarea>
+            </div>
+
+            <div class="full-width">
+                <img id="imagePreview" class="image-preview hidden" alt="Brew preview">
+            </div>
+
+            <div class="full-width">
+                <button class="button primary" type="submit">Save Brew Log</button>
+            </div>
+        </form>
+    </section>
+</main>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Calculator | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <section class="panel calculator-panel">
+        <p class="eyebrow">Ratio Calculator</p>
+        <h1>1:15 brew ratio</h1>
+        <p class="subtle">Enter coffee grams and BrewLog will calculate the water amount in milliliters.</p>
+
+        <div class="calculator-grid">
+            <div>
+                <label for="coffeeGrams">Coffee (g)</label>
+                <input id="coffeeGrams" type="number" min="1" placeholder="20" data-coffee-input>
+            </div>
+            <div>
+                <label for="waterResult">Water (ml)</label>
+                <input id="waterResult" type="text" readonly data-water-output value="300">
+            </div>
+        </div>
+
+        <div class="empty-state">
+            <p class="calculator-result">Example: 20g coffee -> 300ml water</p>
+            <p class="subtle">The result updates instantly as you type.</p>
+        </div>
+    </section>
+</main>
+{% endblock %}

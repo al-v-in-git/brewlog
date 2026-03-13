@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}History | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell dashboard-shell">
+    <section class="panel">
+        <div class="section-title">
+            <div>
+                <p class="eyebrow">Brew History</p>
+                <h1>Your brew archive</h1>
+            </div>
+            <a class="button primary" href="{{ url_for('add_brew') }}">Add Another Brew</a>
+        </div>
+
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+
+        <form method="GET" class="filters-grid" data-history-controls>
+            <div>
+                <label for="search">Search Bean or Notes</label>
+                <input id="search" type="text" name="search" value="{{ filters.search }}" placeholder="Ethiopian, fruity, bright">
+            </div>
+
+            <div>
+                <label for="methodFilter">Filter by Method</label>
+                <select id="methodFilter" name="method">
+                    <option value="">All methods</option>
+                    {% for method_name in filter_options.methods %}
+                    <option value="{{ method_name }}" {% if filters.method == method_name %}selected{% endif %}>{{ method_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="ratingFilter">Filter by Rating</label>
+                <select id="ratingFilter" name="rating">
+                    <option value="">All ratings</option>
+                    {% for rating in filter_options.ratings %}
+                    <option value="{{ rating }}" {% if filters.rating == rating|string %}selected{% endif %}>{{ rating }} stars</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label for="sortSelect">Sort By</label>
+                <select id="sortSelect" name="sort" data-sort-control>
+                    <option value="created_desc" {% if filters.sort == "created_desc" %}selected{% endif %}>Newest First</option>
+                    <option value="created_asc" {% if filters.sort == "created_asc" %}selected{% endif %}>Oldest First</option>
+                    <option value="bean_asc" {% if filters.sort == "bean_asc" %}selected{% endif %}>Bean A-Z</option>
+                    <option value="method_asc" {% if filters.sort == "method_asc" %}selected{% endif %}>Method A-Z</option>
+                    <option value="rating_desc" {% if filters.sort == "rating_desc" %}selected{% endif %}>Highest Rating</option>
+                    <option value="rating_asc" {% if filters.sort == "rating_asc" %}selected{% endif %}>Lowest Rating</option>
+                </select>
+            </div>
+
+            <div class="filters-actions">
+                <button class="button primary" type="submit">Apply</button>
+                <a class="button secondary" href="{{ url_for('history') }}">Reset</a>
+            </div>
+        </form>
+    </section>
+
+    <section class="panel">
+        {% if brew_logs %}
+        <div class="table-wrap">
+            <table data-history-table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Bean Name</th>
+                        <th>Method</th>
+                        <th>Brew Time</th>
+                        <th>Rating</th>
+                        <th>Notes</th>
+                        <th>Image</th>
+                        <th>Favorite</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brew in brew_logs %}
+                    <tr data-history-row data-bean="{{ brew.bean_name|lower }}" data-method="{{ brew.method|lower }}" data-rating="{{ brew.rating }}" data-notes="{{ (brew.notes or '')|lower }}">
+                        <td>{{ brew.created_at.strftime("%d %b %Y") if brew.created_at else "" }}</td>
+                        <td>{{ brew.bean_name }}</td>
+                        <td>{{ brew.method }}</td>
+                        <td>{{ brew.brew_time }}</td>
+                        <td>
+                            <span class="stars" aria-label="{{ brew.rating }} out of 5">
+                                {% for _ in range(brew.rating) %}★{% endfor %}{% for _ in range(5 - brew.rating) %}☆{% endfor %}
+                            </span>
+                        </td>
+                        <td>{{ brew.notes or "No notes" }}</td>
+                        <td>
+                            {% if brew.image_path %}
+                            <img class="brew-thumb" src="{{ url_for('static', filename=brew.image_path) }}" alt="{{ brew.bean_name }}">
+                            {% else %}
+                            <span class="subtle">No image</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ "Yes" if brew.favorite else "No" }}</td>
+                        <td>
+                            <div class="table-actions">
+                                <form method="POST" action="{{ url_for('toggle_favorite', log_id=brew.log_id) }}">
+                                    <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                                    <button class="button secondary small-button" type="submit">
+                                        {{ "Unfavorite" if brew.favorite else "Favorite" }}
+                                    </button>
+                                </form>
+                                <form method="POST" action="{{ url_for('delete_brew', log_id=brew.log_id) }}" onsubmit="return confirm('Delete this brew entry?');">
+                                    <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+                                    <button class="button danger small-button" type="submit">Delete</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No brews match your filters.</p>
+            <p class="subtle">Try a broader search or add a fresh brew entry.</p>
+        </div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

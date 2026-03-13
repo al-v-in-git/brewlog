@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell hero-shell">
+    <section class="hero-card">
+        <p class="eyebrow">Coffee Brewing Tracker</p>
+        <h1>Log every cup with BrewLog</h1>
+        <p class="lead">
+            Track brew history, compare methods, upload coffee photos, and keep your favorite recipes in one place.
+        </p>
+        <div class="actions">
+            <a class="button primary" href="{{ url_for('signup') }}">Create Account</a>
+            <a class="button secondary" href="{{ url_for('login') }}">Log In</a>
+        </div>
+    </section>
+</main>
+{% endblock %}

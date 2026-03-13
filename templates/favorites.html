@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Favorites | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell dashboard-shell">
+    <section class="panel">
+        <div class="section-title">
+            <div>
+                <p class="eyebrow">Favorite Recipes</p>
+                <h1>Your saved brews</h1>
+            </div>
+            <a class="button primary" href="{{ url_for('history') }}">Back to History</a>
+        </div>
+
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+    </section>
+
+    <section class="panel">
+        {% if brew_logs %}
+        <div class="favorites-grid">
+            {% for brew in brew_logs %}
+            <article class="favorite-card">
+                {% if brew.image_path %}
+                <img class="favorite-image" src="{{ url_for('static', filename=brew.image_path) }}" alt="{{ brew.bean_name }}">
+                {% endif %}
+                <p class="eyebrow">{{ brew.created_at.strftime("%d %b %Y") if brew.created_at else "" }}</p>
+                <h2>{{ brew.bean_name }}</h2>
+                <p class="subtle">{{ brew.method }} | {{ brew.brew_time }} | {{ brew.water_temp }} C</p>
+                <p class="stars" aria-label="{{ brew.rating }} out of 5">
+                    {% for _ in range(brew.rating) %}★{% endfor %}{% for _ in range(5 - brew.rating) %}☆{% endfor %}
+                </p>
+                <p>{{ brew.notes or "No notes" }}</p>
+                <form method="POST" action="{{ url_for('toggle_favorite', log_id=brew.log_id) }}">
+                    <input type="hidden" name="next" value="{{ url_for('favorites') }}">
+                    <button class="button secondary small-button" type="submit">Remove Favorite</button>
+                </form>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No favorites yet.</p>
+            <p class="subtle">Mark a brew as favorite from the history page or when adding a new brew.</p>
+        </div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Login | BrewLog{% endblock %}
+
+{% block content %}
+<main class="shell">
+    <section class="panel auth-panel">
+        <p class="eyebrow">Welcome Back</p>
+        <h1>Log in to BrewLog</h1>
+        <p class="subtle">Access your dashboard, brew history, analytics, and favorite recipes.</p>
+
+        {% if error %}
+        <p class="message error">{{ error }}</p>
+        {% endif %}
+
+        <form method="POST" class="stack-form">
+            <label for="email">Email</label>
+            <input id="email" type="email" name="email" required>
+
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password" required>
+
+            <button class="button primary" type="submit">Log In</button>
+        </form>
+
+        <p class="subtle">New to BrewLog? <a href="{{ url_for('signup') }}">Create an account</a>.</p>
+    </section>
+</main>
+{% endblock %}
