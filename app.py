@@ -1,22 +1,20 @@
 import os
+import sqlite3
 import uuid
+from datetime import datetime
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
-import mysql.connector
-from mysql.connector import Error, IntegrityError
+from dotenv import load_dotenv
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
+
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "brewlog_secret")
 
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST", "127.0.0.1"),
-    "port": int(os.getenv("DB_PORT", "3307")),
-    "user": os.getenv("DB_USER", "root"),
-    "password": os.getenv("DB_PASSWORD", ""),
-    "database": os.getenv("DB_NAME", "brewlog"),
-}
+DATABASE_PATH = os.getenv("DATABASE_PATH", os.path.join(app.root_path, "brewlog.db"))
 
 app.config["UPLOAD_FOLDER"] = os.path.join(app.root_path, "static", "uploads")
 app.config["MAX_CONTENT_LENGTH"] = 4 * 1024 * 1024
@@ -32,29 +30,68 @@ DEFAULT_BEANS = [
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 
-def get_server_connection():
-    return mysql.connector.connect(
-        host=DB_CONFIG["host"],
-        port=DB_CONFIG["port"],
-        user=DB_CONFIG["user"],
-        password=DB_CONFIG["password"],
-    )
+Error = sqlite3.Error
+IntegrityError = sqlite3.IntegrityError
+
+
+class SQLiteCursorWrapper:
+    def __init__(self, cursor, dictionary=False):
+        self.cursor = cursor
+        self.dictionary = dictionary
+
+    def execute(self, query, params=()):
+        self.cursor.execute(query.replace("%s", "?"), params)
+        return self
+
+    def fetchone(self):
+        row = self.cursor.fetchone()
+        if row is None:
+            return None
+        if self.dictionary and isinstance(row, sqlite3.Row):
+            return dict(row)
+        return row
+
+    def fetchall(self):
+        rows = self.cursor.fetchall()
+        if self.dictionary:
+            return [dict(row) if isinstance(row, sqlite3.Row) else row for row in rows]
+        return rows
+
+    def close(self):
+        self.cursor.close()
+
+
+class SQLiteConnectionWrapper:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def cursor(self, dictionary=False):
+        return SQLiteCursorWrapper(self.connection.cursor(), dictionary=dictionary)
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
 
 
 def get_db_connection():
-    return mysql.connector.connect(**DB_CONFIG)
+    connection = sqlite3.connect(DATABASE_PATH)
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return SQLiteConnectionWrapper(connection)
+
+
+def describe_db_error(exc):
+    if "unable to open database file" in str(exc).lower():
+        return f"Could not open the local database at {DATABASE_PATH}."
+    return str(exc)
 
 
 def column_exists(cursor, table_name, column_name):
-    cursor.execute(
-        """
-        SELECT COUNT(*)
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s AND COLUMN_NAME = %s
-        """,
-        (DB_CONFIG["database"], table_name, column_name),
-    )
-    return cursor.fetchone()[0] > 0
+    cursor.execute(f"PRAGMA table_info({table_name})")
+    columns = cursor.fetchall()
+    return any(column["name"] == column_name for column in columns)
 
 
 def ensure_column(cursor, table_name, column_name, definition):
@@ -63,22 +100,16 @@ def ensure_column(cursor, table_name, column_name, definition):
 
 
 def initialize_database():
-    server_db = get_server_connection()
-    server_cursor = server_db.cursor()
-    server_cursor.execute(f"CREATE DATABASE IF NOT EXISTS {DB_CONFIG['database']}")
-    server_cursor.close()
-    server_db.close()
-
     db = get_db_connection()
     cursor = db.cursor()
 
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
-            user_id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            email VARCHAR(100) NOT NULL UNIQUE,
-            password VARCHAR(100) NOT NULL
+            user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            password TEXT NOT NULL
         )
         """
     )
@@ -86,10 +117,10 @@ def initialize_database():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS coffee_beans (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL UNIQUE,
-            origin VARCHAR(100) NOT NULL,
-            roast_level VARCHAR(50) NOT NULL
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            origin TEXT NOT NULL,
+            roast_level TEXT NOT NULL
         )
         """
     )
@@ -97,32 +128,32 @@ def initialize_database():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS brewlogs (
-            log_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT NOT NULL,
-            bean_name VARCHAR(100) NOT NULL,
-            method VARCHAR(50) NOT NULL,
-            grind_size VARCHAR(50) NOT NULL,
-            water_temp INT NOT NULL,
-            brew_time VARCHAR(20) NOT NULL,
-            rating INT NOT NULL,
+            log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            bean_name TEXT NOT NULL,
+            method TEXT NOT NULL,
+            grind_size TEXT NOT NULL,
+            water_temp INTEGER NOT NULL,
+            brew_time TEXT NOT NULL,
+            rating INTEGER NOT NULL,
             notes TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            favorite BOOLEAN NOT NULL DEFAULT FALSE,
-            image_path VARCHAR(255),
-            bean_id INT NULL,
+            favorite INTEGER NOT NULL DEFAULT 0,
+            image_path TEXT,
+            bean_id INTEGER,
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         )
         """
     )
 
-    ensure_column(cursor, "brewlogs", "favorite", "BOOLEAN NOT NULL DEFAULT FALSE")
-    ensure_column(cursor, "brewlogs", "image_path", "VARCHAR(255) NULL")
-    ensure_column(cursor, "brewlogs", "bean_id", "INT NULL")
+    ensure_column(cursor, "brewlogs", "favorite", "INTEGER NOT NULL DEFAULT 0")
+    ensure_column(cursor, "brewlogs", "image_path", "TEXT NULL")
+    ensure_column(cursor, "brewlogs", "bean_id", "INTEGER NULL")
 
     for bean_name, origin, roast_level in DEFAULT_BEANS:
         cursor.execute(
             """
-            INSERT IGNORE INTO coffee_beans (name, origin, roast_level)
+            INSERT OR IGNORE INTO coffee_beans (name, origin, roast_level)
             VALUES (%s, %s, %s)
             """,
             (bean_name, origin, roast_level),
@@ -145,6 +176,31 @@ def login_required(view_func):
 
 def allowed_image(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+
+def verify_password(stored_password, password):
+    if stored_password == password:
+        return True
+
+    try:
+        return check_password_hash(stored_password, password)
+    except ValueError:
+        return False
+
+
+def upgrade_password_if_needed(user_id, stored_password, password):
+    if stored_password != password:
+        return
+
+    db = get_db_connection()
+    cursor = db.cursor()
+    cursor.execute(
+        "UPDATE users SET password = %s WHERE user_id = %s",
+        (generate_password_hash(password), user_id),
+    )
+    db.commit()
+    cursor.close()
+    db.close()
 
 
 def fetch_coffee_beans():
@@ -247,6 +303,12 @@ def fetch_brew_logs(user_id, filters=None, favorites_only=False):
     brew_logs = cursor.fetchall()
     cursor.close()
     db.close()
+
+    for brew in brew_logs:
+        created_at = brew.get("created_at") if isinstance(brew, dict) else None
+        if isinstance(created_at, str):
+            brew["created_at"] = datetime.fromisoformat(created_at)
+
     return brew_logs
 
 
@@ -361,7 +423,7 @@ def fetch_analytics(user_id):
 
     cursor.execute(
         """
-        SELECT CONCAT(rating, ' Stars') AS label, COUNT(*) AS value
+        SELECT CAST(rating AS TEXT) || ' Stars' AS label, COUNT(*) AS value
         FROM brewlogs
         WHERE user_id = %s
         GROUP BY rating
@@ -405,7 +467,7 @@ DB_INIT_ERROR = None
 try:
     initialize_database()
 except Error as exc:
-    DB_INIT_ERROR = f"Database initialization warning: {exc}"
+    DB_INIT_ERROR = f"Database initialization warning: {describe_db_error(exc)}"
 
 
 @app.route("/")
@@ -427,7 +489,7 @@ def signup():
             cursor = db.cursor()
             cursor.execute(
                 "INSERT INTO users (name, email, password) VALUES (%s, %s, %s)",
-                (name, email, password),
+                (name, email, generate_password_hash(password)),
             )
             db.commit()
             cursor.close()
@@ -436,7 +498,7 @@ def signup():
         except IntegrityError:
             error = "An account with that email already exists."
         except Error as exc:
-            error = f"Database error: {exc}"
+            error = f"Database error: {describe_db_error(exc)}"
 
     return render_template("signup.html", error=error)
 
@@ -451,23 +513,24 @@ def login():
 
         try:
             db = get_db_connection()
-            cursor = db.cursor()
+            cursor = db.cursor(dictionary=True)
             cursor.execute(
-                "SELECT user_id, name FROM users WHERE email = %s AND password = %s",
-                (email, password),
+                "SELECT user_id, name, password FROM users WHERE email = %s",
+                (email,),
             )
             user = cursor.fetchone()
             cursor.close()
             db.close()
 
-            if user:
-                session["user_id"] = user[0]
-                session["user_name"] = user[1]
+            if user and verify_password(user["password"], password):
+                upgrade_password_if_needed(user["user_id"], user["password"], password)
+                session["user_id"] = user["user_id"]
+                session["user_name"] = user["name"]
                 return redirect(url_for("dashboard"))
 
             error = "Invalid email or password."
         except Error as exc:
-            error = f"Database error: {exc}"
+            error = f"Database error: {describe_db_error(exc)}"
 
     return render_template("login.html", error=error)
 
@@ -489,7 +552,7 @@ def dashboard():
         brew_logs = fetch_brew_logs(session["user_id"], {"sort": "created_desc"})[:5]
         summary = fetch_dashboard_summary(session["user_id"])
     except Error as exc:
-        error = f"Database error: {exc}"
+        error = f"Database error: {describe_db_error(exc)}"
 
     return render_template(
         "dashboard.html",
@@ -517,7 +580,7 @@ def history():
         brew_logs = fetch_brew_logs(session["user_id"], filters)
         filter_options = fetch_filter_options(session["user_id"])
     except Error as exc:
-        error = f"Database error: {exc}"
+        error = f"Database error: {describe_db_error(exc)}"
 
     return render_template(
         "history.html",
@@ -541,7 +604,7 @@ def favorites():
             favorites_only=True,
         )
     except Error as exc:
-        error = f"Database error: {exc}"
+        error = f"Database error: {describe_db_error(exc)}"
 
     return render_template("favorites.html", brew_logs=brew_logs, error=error)
 
@@ -564,7 +627,7 @@ def analytics():
     try:
         analytics_data = fetch_analytics(session["user_id"])
     except Error as exc:
-        error = f"Database error: {exc}"
+        error = f"Database error: {describe_db_error(exc)}"
 
     return render_template("analytics.html", analytics=analytics_data, error=error)
 
@@ -584,7 +647,7 @@ def add_brew():
     try:
         beans = fetch_coffee_beans()
     except Error as exc:
-        error = f"Database error: {exc}"
+        error = f"Database error: {describe_db_error(exc)}"
 
     if request.method == "POST":
         bean_id = request.form["bean_id"].strip()
@@ -633,7 +696,7 @@ def add_brew():
         except ValueError as exc:
             error = str(exc)
         except Error as exc:
-            error = f"Database error: {exc}"
+            error = f"Database error: {describe_db_error(exc)}"
 
     return render_template("add_brew.html", error=error, beans=beans)
 

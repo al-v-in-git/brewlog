@@ -12,9 +12,17 @@ BrewLog is a full-stack web application that allows users to track and analyze c
 
 ## Tech Stack
 - Python (Flask)
-- MySQL
+- SQLite
 - HTML / CSS / JavaScript
 
 ## Run Locally
-pip install -r requirements.txt
-python app.py
+`pip install -r requirements.txt`
+
+Create a `.env` file from `.env.example` if you want to customize the app secret or database file location:
+
+- `DATABASE_PATH=brewlog.db`
+- `SECRET_KEY=brewlog_secret`
+
+Then run:
+
+`python app.py`
